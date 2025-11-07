@@ -1,0 +1,123 @@
+clear_screen:
+#local
+    ld c, 0x00
+    ld hl, vram_start
+
+repeat:
+    ld (hl), c
+    inc hl
+
+    ld a, l
+    cp a, 0xfe
+    jp nz, repeat
+
+    ld a, h
+    cp a, 0x3f
+    jp nz, repeat
+
+    ret
+#endlocal
+
+set_position_print_string:
+#local
+    ld (message_ptr), hl
+    ex de, hl
+
+    ld (cursor_pos), hl
+    ex de, hl
+
+print:
+    ld l, (hl)
+    ld h, 0x00
+
+    add hl, hl
+    add hl, hl
+    add hl, hl
+    ld bc, hl
+
+    ld de, glyph_start
+    ex de, hl
+    add hl, bc
+    ex de, hl
+
+loop_set:
+    ld hl, (cursor_pos)
+    ld bc, 0x0020
+    ld a, 0x08
+repeat:
+    push af
+    ld a, (de)
+    ld (hl), a
+    add hl, bc
+    inc de
+    pop af
+loop_check:
+    dec a
+    jp nz, repeat
+
+verify:
+    ld hl, cursor_pos
+    inc (hl)
+
+    ld hl, message_ptr
+    inc (hl)
+
+    ld hl, (message_ptr)
+    ld a, (hl)
+    cp a, 0xff
+
+    jp nz, print
+
+    ret
+#endlocal
+
+init_random_seed:
+#local
+    ld hl, 0xfff1
+    ld (current_seed), hl
+
+    ld hl, is_seed_started
+    inc (hl)
+
+    ret
+#endlocal
+
+set_random_next:
+#local
+    ld c, 0x08
+    ld a, (current_seed+0)
+
+repeat:
+    ; Shift left equivalent
+    add a, a
+
+    push af
+    ld a, (current_seed+1)
+    rla
+    ld (current_seed+1), a
+    jp nc, skip_xor
+
+    pop af
+    xor 0x39
+    push af
+
+skip_xor:
+    pop af
+    dec c
+    jp nz, repeat
+
+    ld (current_seed+0), a
+
+    ; Set the flags
+    cp a, 0x00
+
+    ret
+#endlocal
+
+get_random_0_to_n:
+#local
+    ld a, (current_seed+0)
+    and e
+
+    ret
+#endlocal

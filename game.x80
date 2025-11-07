@@ -1,0 +1,598 @@
+#!/usr/bin/zasm --8080 --reqcolon -l0 -o binary.rom
+; split -db 2048 binary.rom maze.
+
+#target rom
+
+#data ARCADE_RAM, 0x2000
+
+UP_BUTTON           equ 0x08
+LEFT_BUTTON         equ 0x01
+DOWN_BUTTON         equ 0x04
+RIGHT_BUTTON        equ 0x02
+SCORE_DIGITS        equ 6
+GRID_SIZE           equ 4*4
+
+array_grid:         data GRID_SIZE
+
+array_finish:       data 1
+message_ptr:        data 2
+array_index_ptr:    data 2
+score_digits:       data SCORE_DIGITS
+score_terminator:   data 1
+overscan_grid:      data 8
+
+buffer_grid:        data GRID_SIZE
+
+buffer_finish:      data 1
+current_seed:       data 2
+is_seed_started:    data 1
+cursor_pos:         data 2
+current_screen:     data 1
+current_pressed:    data 1
+generate_new_tile:  data 1
+score_to_add:       data 2
+score_bcd_lo:       data 1
+score_bcd_mi:       data 1
+score_bcd_hi:       data 1
+draw_grid_pos:      data 2
+
+#data ARCADE_VRAM, 0x2400
+
+vram_start:         data 1
+
+#code ARCADE_ROM, 0x0000
+
+ld_de_vram: .macro row, col
+    ld de, vram_start+&row00+&col
+.endm
+
+reset:
+    nop
+    nop
+    nop
+
+    jp main
+
+main:
+
+verify_screen_state:
+    ld a, (current_screen)
+    cp a, 0x01
+    jp z, draw_player_selection
+
+    ld a, (current_screen)
+    cp a, 0x02
+    jp z, verify_win_lose
+
+initialize_memory:
+    xor a
+    ld (overscan_grid+0), a
+    ld (overscan_grid+1), a
+    ld (overscan_grid+2), a
+    ld (overscan_grid+3), a
+    ld (overscan_grid+4), a
+    ld (overscan_grid+5), a
+    ld (overscan_grid+6), a
+    ld (overscan_grid+7), a
+    ld (score_bcd_lo), a
+    ld (score_bcd_mi), a
+    ld (score_bcd_hi), a
+
+    ld a, 0x1c
+    ld (score_digits+0), a
+    ld (score_digits+1), a
+    ld (score_digits+2), a
+    ld (score_digits+3), a
+    ld (score_digits+4), a
+    ld (score_digits+5), a
+
+    ld a, 0xff
+    ld (array_finish), a
+    ld (buffer_finish), a
+    ld (score_terminator), a
+
+    ld a, 0x01
+    ld (generate_new_tile), a
+
+    ld hl, array_grid-1
+    ld (array_index_ptr), hl
+clear_grid:
+    ld hl, (array_index_ptr)
+    inc hl
+    ld (array_index_ptr), hl
+
+    ld a, (hl)
+    cp a, 0xff
+    jp z, print_game_title
+
+    ld (hl), 0x00
+
+    jp clear_grid
+
+print_game_title:
+    ld hl, game_title
+    ld_de_vram 0x0a, 0x0a
+    call set_position_print_string
+
+    ld hl, coin_text
+    ld_de_vram 0x11, 0x09
+    call set_position_print_string
+
+read_coin:
+    in a, (0x01)
+    and 0x08
+    jp z, read_coin
+
+    call clear_screen
+    ld a, 0x01
+    ld (current_screen), a
+    jp draw_player_selection
+
+draw_player_selection:
+    ld hl, press_text
+    ld_de_vram 0x0a, 0x04
+    call set_position_print_string
+
+    ld hl, start_text
+    ld_de_vram 0x11, 0x0a
+    call set_position_print_string
+
+read_one_player_button:
+    in a, (0x01)
+    and 0x01
+    jp z, read_one_player_button
+
+    call clear_screen
+    ld a, 0x02
+    ld (current_screen), a
+
+    ld a, (is_seed_started)
+    cp a, 0x00
+    call z, init_random_seed
+
+draw_grid:
+    ld hl, score_top
+    ld_de_vram 0x02, 0x0a
+    call set_position_print_string
+
+    ld hl, grid_top
+    ld_de_vram 0x04, 0x06
+    call set_position_print_string
+
+    ld hl, grid_cell
+    ld_de_vram 0x05, 0x06
+    call set_position_print_string
+
+    ld hl, grid_middle
+    ld_de_vram 0x06, 0x06
+    call set_position_print_string
+
+    ld hl, grid_cell
+    ld_de_vram 0x07, 0x06
+    call set_position_print_string
+
+    ld hl, grid_middle
+    ld_de_vram 0x08, 0x06
+    call set_position_print_string
+
+    ld hl, grid_cell
+    ld_de_vram 0x09, 0x06
+    call set_position_print_string
+
+    ld hl, grid_middle
+    ld_de_vram 0x0a, 0x06
+    call set_position_print_string
+
+    ld hl, grid_cell
+    ld_de_vram 0x0b, 0x06
+    call set_position_print_string
+
+    ld hl, grid_bottom
+    ld_de_vram 0x0c, 0x06
+    call set_position_print_string
+
+print_score_digits:
+    ld hl, score_digits
+    ld_de_vram 0x02, 0x11
+    call set_position_print_string
+
+    ld hl, 0x0000
+    ld (score_to_add), hl
+
+update_array:
+    call set_random_next
+    ld e, 0x0f
+    call get_random_0_to_n
+    ld b, 0x00
+    ld c, a
+
+check_empty_cell:
+    xor a
+    ld (generate_new_tile), a
+
+    ld hl, array_grid+0
+    add hl, bc
+
+    ld a, (hl)
+    cp a, 0x00
+    jp nz, update_array
+
+    call set_random_next
+    ld e, 0x07
+    call get_random_0_to_n
+
+    cp a, 0x00
+    jp z, spawn_four
+
+spawn_two:
+    ld a, #<(power_2)
+    jp continue_cell
+
+spawn_four:
+    ld a, #<(power_4)
+    jp continue_cell
+
+spawn_empty:
+    ld a, #<(power_empty)
+
+continue_cell:
+    ld (hl), a
+
+    ld hl, array_grid-1
+    ld (array_index_ptr), hl
+
+    ld hl, 0x0705
+    ld (draw_grid_pos), hl
+
+draw_numbers:
+    ld hl, (array_index_ptr)
+    inc hl
+    ld (array_index_ptr), hl
+
+    ld a, (hl)
+    cp a, 0xff
+    jp z, verify_win_lose
+
+    ld e, a
+    ld d, 0x00
+    ld hl, power_empty
+    add hl, de
+
+    ld a, (draw_grid_pos)
+    ld (draw_grid_pos), a
+    add a, 0x24
+    ld d, a
+
+    ld a, (draw_grid_pos+1)
+    ld e, a
+    add a, 0x05
+    ld (draw_grid_pos+1), a
+
+    cp a, 0x17
+    jp m, skip_increment
+
+increment_row_and_reset_column:
+    ld a, (draw_grid_pos)
+    add a, 0x02
+    ld (draw_grid_pos), a
+
+    ld a, 0x07
+    ld (draw_grid_pos+1), a
+
+skip_increment:
+    call set_position_print_string
+
+    jp draw_numbers
+
+verify_win_lose:
+    ld hl, array_grid
+    call check_win_status
+    jp z, draw_you_won
+
+    ld hl, array_grid
+    call check_lose_status
+    jp m, draw_you_lost
+
+read_arrow_button:
+    ld hl, left_pressed
+    ld (message_ptr), hl
+    in a, (0x00)
+    and 0x01
+    jp nz, check_previous_button
+
+    ld hl, right_pressed
+    ld (message_ptr), hl
+    in a, (0x00)
+    and 0x02
+    jp nz, check_previous_button
+
+    ld hl, down_pressed
+    ld (message_ptr), hl
+    in a, (0x00)
+    and 0x04
+    jp nz, check_previous_button
+
+    ld hl, up_pressed
+    ld (message_ptr), hl
+    in a, (0x00)
+    and 0x08
+    jp nz, check_previous_button
+
+    ; Clear pressed button when none is pressed
+    xor a
+    ld (current_pressed), a
+
+    jp read_arrow_button
+
+check_previous_button:
+    ld hl, current_pressed
+    ld l, (hl)
+    cp a, l
+    jp z, read_arrow_button
+    ld (current_pressed), a
+
+shift_row_array:
+    ld hl, array_grid
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_1
+    ld hl, array_grid+1
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_2
+    ld hl, array_grid+2
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_3
+
+    ld hl, array_grid+4
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_1
+    ld hl, array_grid+5
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_2
+    ld hl, array_grid+6
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_3
+
+    ld hl, array_grid+8
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_1
+    ld hl, array_grid+9
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_2
+    ld hl, array_grid+10
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_3
+
+    ld hl, array_grid+12
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_1
+    ld hl, array_grid+13
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_2
+    ld hl, array_grid+14
+    ld (array_index_ptr), hl
+    call remove_extra_row_spaces_3
+
+shift_column_array:
+    ld hl, array_grid
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_1
+    ld hl, array_grid+4
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_2
+    ld hl, array_grid+8
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_3
+
+    ld hl, array_grid+1
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_1
+    ld hl, array_grid+5
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_2
+    ld hl, array_grid+9
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_3
+
+    ld hl, array_grid+2
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_1
+    ld hl, array_grid+6
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_2
+    ld hl, array_grid+10
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_3
+
+    ld hl, array_grid+3
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_1
+    ld hl, array_grid+7
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_2
+    ld hl, array_grid+11
+    ld (array_index_ptr), hl
+    call remove_extra_column_spaces_3
+
+merge_column_array:
+    ld hl, array_grid
+    ld de, buffer_grid
+    ld a, (current_pressed)
+    call grid_copy
+
+    ld hl, buffer_grid
+    ld a, (current_pressed)
+    call grid_transpose
+
+    ld hl, buffer_grid+15
+    call merge_tiles
+
+    ld hl, buffer_grid
+    ld de, array_grid
+    ld a, (current_pressed)
+    call grid_copy
+
+    ld hl, array_grid
+    ld a, (current_pressed)
+    call grid_transpose
+
+print_pressed_button:
+    ld hl, (message_ptr)
+    ld_de_vram 0x1a, 0x00
+    call set_position_print_string
+
+increment_score_lo:
+    ld hl, (score_to_add)
+
+    ld a, (score_bcd_lo)
+    add a, l
+    daa
+    ld (score_bcd_lo), a
+    push af
+
+    push af
+    and 0x0f
+    add a, 0x1c
+    ld (score_digits+5), a
+    pop af
+
+    and 0xf0
+    rra
+    rra
+    rra
+    rra
+    add a, 0x1c
+    ld (score_digits+4), a
+
+    pop af
+    jp nc, print_score_digits
+
+increment_score_mi:
+    ; Clear the carry flag for correct sum
+    ccf
+    ld a, (score_bcd_mi)
+    add a, 0x02
+    daa
+    ld (score_bcd_mi), a
+    push af
+
+    push af
+    and 0x0f
+    add a, 0x1c
+    ld (score_digits+3), a
+    pop af
+
+    and 0xf0
+    rra
+    rra
+    rra
+    rra
+    add a, 0x1c
+    ld (score_digits+2), a
+
+    pop af
+    jp nc, print_score_digits
+
+increment_score_hi:
+    ; Clear the carry flag for correct sum
+    ccf
+    ld a, (score_bcd_hi)
+    add a, 0x02
+    daa
+    ld (score_bcd_hi), a
+
+    push af
+    and 0x0f
+    add a, 0x1c
+    ld (score_digits+1), a
+    pop af
+
+    and 0xf0
+    rra
+    rra
+    rra
+    rra
+    add a, 0x1c
+    ld (score_digits+0), a
+
+    jp print_score_digits
+
+draw_you_lost:
+    ld hl, you_lost
+    ld_de_vram 0x0e, 0x0c
+    call set_position_print_string
+
+    jp timer_delay
+
+draw_you_won:
+    ld hl, you_won
+    ld_de_vram 0x0e, 0x0d
+    call set_position_print_string
+
+timer_delay:
+    ld hl, 0x0000
+timer_delay_lo:
+    inc l
+    jp nz, timer_delay_lo
+timer_delay_hi:
+    inc h
+    jp nz, timer_delay_lo
+
+back_to_title_screen:
+    xor a
+    ld (current_screen), a
+
+    call clear_screen
+
+    jp initialize_memory
+
+ds 0x0800 - $
+
+#code ARCADE_ROM_OFFSET, 0x0800
+
+;; Read-only data section (RODATA)
+
+power_empty:    db 0x1b, 0x1b, 0x1b, 0x1b, 0xff
+power_2:        db 0x1b, 0x1b, 0x1b, 0x1e, 0xff
+power_4:        db 0x1b, 0x1b, 0x1b, 0x20, 0xff
+power_8:        db 0x1b, 0x1b, 0x1b, 0x24, 0xff
+power_16:       db 0x1b, 0x1b, 0x1d, 0x22, 0xff
+power_32:       db 0x1b, 0x1b, 0x1f, 0x1e, 0xff
+power_64:       db 0x1b, 0x1b, 0x22, 0x20, 0xff
+power_128:      db 0x1b, 0x1d, 0x1e, 0x24, 0xff
+power_256:      db 0x1b, 0x1e, 0x21, 0x22, 0xff
+power_512:      db 0x1b, 0x21, 0x1d, 0x1e, 0xff
+power_1024:     db 0x1d, 0x1c, 0x1e, 0x20, 0xff
+power_2048:     db 0x1e, 0x1c, 0x20, 0x24, 0xff
+
+game_title:     db 0x15, 0x10, 0x1b, 0x14, 0x0f, 0x1b, 0x05, 0x0c, 0x05, 0x16, 0x05, 0x0e, 0xff
+coin_text:      db 0x09, 0x0e, 0x13, 0x05, 0x12, 0x14, 0x1b, 0x01, 0x1b, 0x03, 0x0f, 0x09, 0x0e, 0x1b, 0x26, 0xff
+
+press_text:     db 0x10, 0x12, 0x05, 0x13, 0x13, 0x1b, 0x14, 0x08, 0x05, 0x1b, 0x1d, 0x1b, 0x10, 0x0c, 0x01, 0x19, 0x05, 0x12, 0x1b, 0x02, 0x15, 0x14, 0x14, 0x0f, 0x0e, 0xff
+start_text:     db 0x14, 0x0f, 0x1b, 0x13, 0x14, 0x01, 0x12, 0x14, 0x1b, 0x07, 0x01, 0x0d, 0x05, 0xff
+info_text:      db 0x0c, 0x0f, 0x15, 0x09, 0x13, 0x1b, 0x10, 0x01, 0x15, 0x0c, 0xff
+
+you_won:        db 0x19, 0x0f, 0x15, 0x1b, 0x17, 0x0f, 0x0e, 0x00, 0xff
+you_lost:       db 0x19, 0x0f, 0x15, 0x1b, 0x0c, 0x0f, 0x13, 0x14, 0x00, 0xff
+
+score_top:      db 0x13, 0x03, 0x0f, 0x12, 0x05, 0x27, 0x1b, 0xff
+grid_top:       db 0x28, 0x29, 0x29, 0x29, 0x29, 0x2c, 0x29, 0x29, 0x29, 0x29, 0x2c, 0x29, 0x29, 0x29, 0x29, 0x2c, 0x29, 0x29, 0x29, 0x29, 0x2a, 0xff
+grid_cell:      db 0x2b, 0x1b, 0x1b, 0x1b, 0x1b, 0x2b, 0x1b, 0x1b, 0x1b, 0x1b, 0x2b, 0x1b, 0x1b, 0x1b, 0x1b, 0x2b, 0x1b, 0x1b, 0x1b, 0x1b, 0x2b, 0xff
+grid_middle:    db 0x2d, 0x29, 0x29, 0x29, 0x29, 0x2e, 0x29, 0x29, 0x29, 0x29, 0x2e, 0x29, 0x29, 0x29, 0x29, 0x2e, 0x29, 0x29, 0x29, 0x29, 0x2f, 0xff
+grid_bottom:    db 0x30, 0x29, 0x29, 0x29, 0x29, 0x31, 0x29, 0x29, 0x29, 0x29, 0x31, 0x29, 0x29, 0x29, 0x29, 0x31, 0x29, 0x29, 0x29, 0x29, 0x32, 0xff
+
+score_search:   db 0x00, 0x05, 0x0a, 0x0f, 0x14, 0x19, 0x1e, 0x23, 0x28, 0x2d, 0x32, 0x37, 0xff
+score_table:    db 0x00, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0xf0, 0xf0, 0xf0, 0xf0, 0x00
+
+left_pressed:   db 0x0c, 0x05, 0x06, 0x14, 0x1b, 0xff
+right_pressed:  db 0x12, 0x09, 0x07, 0x08, 0x14, 0xff
+down_pressed:   db 0x04, 0x0f, 0x17, 0x0e, 0x1b, 0xff
+up_pressed:     db 0x15, 0x10, 0x1b, 0x1b, 0x1b, 0xff
+
+#include "arcadelib/glyphs.x80"
+
+;; Reusable code section
+
+#include "arcadelib/grid.x80"
+#include "arcadelib/functions.x80"
+
+ds 0x1000 - $

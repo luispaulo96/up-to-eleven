@@ -1,0 +1,793 @@
+check_win_status:
+#local
+repeat:
+    ld a, (hl)
+
+    cp a, 0x37
+    ret z
+
+    and a, 0xff
+    ret m
+
+    inc hl
+    jp repeat
+
+    ret
+#endlocal
+
+check_lose_status:
+#local
+repeat:
+    ld a, (hl)
+
+    or a, a
+    ret z
+
+    and a, 0xff
+    ret m
+
+    inc hl
+    jp repeat
+
+    ret
+#endlocal
+
+remove_extra_row_spaces_1:
+#local
+    ld c, 0x03
+    ld a, (current_pressed)
+    cp a, 0x01
+    jp z, row_shift_left
+    cp a, 0x02
+    jp z, row_shift_right
+
+    ret
+
+row_shift_left:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_left
+
+    ret
+
+row_shift_right:
+    ld hl, (array_index_ptr)
+    inc hl
+    inc hl
+    inc hl
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_right
+
+    ret
+#endlocal
+
+remove_extra_row_spaces_2:
+#local
+    ld c, 0x02
+    ld a, (current_pressed)
+    cp a, 0x01
+    jp z, row_shift_left
+    cp a, 0x02
+    jp z, row_shift_right
+
+    ret
+
+row_shift_left:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_left
+
+    ret
+
+row_shift_right:
+    ld hl, (array_index_ptr)
+    inc hl
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_right
+
+    ret
+#endlocal
+
+remove_extra_row_spaces_3:
+#local
+    ld c, 0x01
+    ld a, (current_pressed)
+    cp a, 0x01
+    jp z, row_shift_left
+    cp a, 0x02
+    jp z, row_shift_right
+
+    ret
+
+row_shift_left:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_left
+
+    ret
+
+row_shift_right:
+    ld hl, (array_index_ptr)
+    dec hl
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_right
+
+    ret
+#endlocal
+
+remove_extra_column_spaces_1:
+#local
+    ld c, 0x03
+    ld a, (current_pressed)
+    cp a, 0x08
+    jp z, row_shift_up
+    cp a, 0x04
+    jp z, row_shift_down
+
+    ret
+
+row_shift_up:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+    inc de
+    inc de
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    inc de
+    inc de
+    inc de
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    inc de
+    inc de
+    inc de
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_up
+
+    ret
+
+row_shift_down:
+    ld hl, (array_index_ptr)
+    ld de, 0x000c
+    add hl, de
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    dec de
+    dec de
+    dec de
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    dec de
+    dec de
+    dec de
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_down
+
+    ret
+#endlocal
+
+remove_extra_column_spaces_2:
+#local
+    ld c, 0x02
+    ld a, (current_pressed)
+    cp a, 0x08
+    jp z, row_shift_up
+    cp a, 0x04
+    jp z, row_shift_down
+
+    ret
+
+row_shift_up:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+    inc de
+    inc de
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    inc de
+    inc de
+    inc de
+    inc de
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_up
+
+    ret
+
+row_shift_down:
+    ld hl, (array_index_ptr)
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    dec de
+    dec de
+    dec de
+    dec de
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_down
+
+    ret
+#endlocal
+
+remove_extra_column_spaces_3:
+#local
+    ld c, 0x02
+    ld a, (current_pressed)
+    cp a, 0x08
+    jp z, row_shift_up
+    cp a, 0x04
+    jp z, row_shift_down
+
+    ret
+
+row_shift_up:
+    ld hl, (array_index_ptr)
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    inc de
+    inc de
+    inc de
+    inc de
+
+    ld a, (de)
+    ld (hl), a
+
+    inc hl
+    inc hl
+    inc hl
+    inc hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_up
+
+    ret
+
+row_shift_down:
+    ld hl, (array_index_ptr)
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    ld a, (hl)
+
+    cp a, 0x00
+    ret nz
+
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    ld de, hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    xor a
+    ld (hl), a
+
+    dec c
+    jp nz, row_shift_down
+
+    ret
+#endlocal
+
+grid_copy:
+#local
+    cp a, DOWN_BUTTON
+    jp z, repeat
+    cp a, RIGHT_BUTTON
+    jp z, repeat
+
+adjust_destination:
+    ex de, hl
+    ld bc, 0x000f
+    add hl, bc
+    ex de, hl
+
+repeat:
+    push af
+    ld a, (hl)
+    cp a, 0xff
+    jp z, finish
+
+    ld (de), a
+    pop af
+
+    inc hl
+
+    cp a, LEFT_BUTTON
+    jp z, rotate
+    cp a, UP_BUTTON
+    jp z, rotate
+
+normal:
+    inc de
+    jp repeat
+
+rotate:
+    dec de
+    jp repeat
+
+finish:
+    pop af
+
+    ret
+#endlocal
+
+grid_transpose:
+#local
+    and a, DOWN_BUTTON | UP_BUTTON
+    ret nz
+
+do_transpose:
+    ld bc, 0x04
+    ld de, hl
+
+    inc de
+    add hl, bc
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    inc de
+    add hl, bc
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    inc de
+    add hl, bc
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    inc de
+    inc de
+    inc de
+    dec hl
+    dec hl
+    dec hl
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    inc de
+    add hl, bc
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    inc de
+    inc de
+    inc de
+    inc de
+    inc hl
+
+    ld a, (de)
+    push af
+    ld a, (hl)
+    ld (de), a
+    pop af
+    ld (hl), a
+
+    ret
+#endlocal
+
+merge_tiles:
+#local
+    ld c, 0x0c
+    ld (array_index_ptr), hl
+
+column_merge_down:
+    ld hl, (array_index_ptr)
+    ld de, hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (hl)
+    cp a, 0x00
+    jp z, next_merge_down
+
+    ex de, hl
+    ld b, (hl)
+    ex de, hl
+    cp a, b
+    jp nz, next_merge_down
+
+do_merge_down:
+    push hl
+    ld hl, generate_new_tile
+    inc (hl)
+    pop hl
+
+    add a, 0x05
+    ld (hl), a
+
+    push bc
+    push hl
+    ld hl, score_search
+search_score_down:
+    ld b, (hl)
+
+    cp a, b
+    jp z, calculate_score
+
+    cp a, 0xff
+    jp z, calculate_score
+
+    inc hl
+
+    jp search_score_down
+calculate_score:
+    ld bc, 0x000d
+    add hl, bc
+    ld a, (hl)
+
+end_calculation:
+    ld (score_to_add), a
+    pop hl
+    pop bc
+
+    ld a, 0x00
+    ld (de), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+    dec hl
+    dec hl
+    dec hl
+    dec hl
+    dec de
+    dec de
+    dec de
+    dec de
+
+    ld a, (de)
+    ld (hl), a
+
+next_merge_down:
+    ld hl, (array_index_ptr)
+    dec hl
+    ld (array_index_ptr), hl
+
+    dec c
+    jp nz, column_merge_down
+
+    ret
+#endlocal
