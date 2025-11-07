@@ -32,6 +32,6 @@ or\
 
 `mkdir -p maze && mv maze.* maze`
 
-4) To run the game on MAME use this command (MAME will complain about the checksums, just ignore it):
+5) To run the game on MAME use the command below (MAME will complain about the checksums, just ignore it):
 
 `mame -rompath . maze`
